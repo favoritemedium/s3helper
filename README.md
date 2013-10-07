@@ -19,15 +19,15 @@ For running the tests:
 
 ## Usage
 
-Include module `S3helper` for the following useful functions:
+Include module **S3helper** for the following useful functions:
 
-### Filestore::ls(dirpath = nil, filesmatch = '*')
+### Filestore::ls(dirpath = nil, filesmatch = '\*')
 
 Get a directory listing. Returns an array of filenames.
 
 - simple globbing (\* and ?) is supported on **filesmatch**
-- `dirpath` must not have a leading slash
-- `filesmatch` must not contain any slashes
+- **dirpath** must not have a leading slash
+- **filesmatch** must not contain any slashes
 - only lists simple files; to list subdirectories use **lsdir**
 
 ### Filestore::lsdir(dirpath = nil)
