@@ -12,6 +12,8 @@ module S3helper
   class Filestore
     class << self
 
+      @@mutex = Mutex.new
+
       # get the bucket instance (probably never need to use this directly)
       def bucket
         @bucket = AWS::S3.new(:access_key_id => ENV["S3_ACCESS_KEY_ID"], :secret_access_key => ENV["S3_SECRET_ACCESS_KEY"]).buckets[ENV["S3_BUCKET"]] if @bucket.nil?
@@ -42,6 +44,17 @@ module S3helper
         bucket.objects[path].write(:file => file, :acl => :public_read)
       end
 
+      # write a file to S3 without overwriting anything
+      # adds an iteration number to the path as needed and returns the path actually used
+      def writenc(path, file)
+        bucket
+        @@mutex.synchronize do
+          path = find_available_name(path)
+          bucket.objects[path].write(:file => file, :acl => :public_read)
+        end
+        path
+      end
+
       # read a file
       def read(path)
         bucket.objects[path].read
@@ -52,6 +65,22 @@ module S3helper
         bucket.objects[path].exists?
       end
 
+      # rename a file
+      def rename(oldpath, newpath)
+        bucket.objects[oldpath].move_to(newpath, :acl => :public_read)
+      end
+
+      # rename a file without overwriting anything
+      # adds an iteration number to the path as needed and returns the path actually used
+      def renamenc(oldpath, newpath)
+        bucket
+        @@mutex.synchronize do
+          newpath = find_available_name(newpath)
+          bucket.objects[oldpath].move_to(newpath, :acl => :public_read)
+        end
+        newpath
+      end
+
       # remove a file from S3
       def delete(path)
         bucket.objects.delete(path)
@@ -60,6 +89,19 @@ module S3helper
       # public access url; append the path to this
       def uribase
         "http://#{ENV['S3_BUCKET']}.#{ENV["S3_HOST"]}/"
+      end
+
+      # helper method for writenc and renamemc
+      # find an unused pathname by appending "-1", "-2", etc.
+      def find_available_name(path)
+        return path unless bucket.objects[path].exists?
+        ext = File.extname(path)
+        base = path[0..-ext.size-1] + "-1"
+        loop do
+          path = base + ext
+          return path unless bucket.objects[path].exists?
+          base = base.next
+        end
       end
 
     end

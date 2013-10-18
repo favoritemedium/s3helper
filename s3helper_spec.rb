@@ -20,15 +20,29 @@ describe S3helper do
 
   context "for a simple file" do
     before :all do
+
       @file = Tempfile.new('foo')
       @message = Faker::Lorem::paragraph
       @file.write(@message)
       @file.close
-      @path = "rspec-testfile"
+
+      @filetoo = Tempfile.new('bar')
+      @messagetoo = Faker::Lorem::paragraph
+      @filetoo.write(@messagetoo)
+      @filetoo.close
+
+      @path = "rspec-testfile.txt"
+      @path1 = "rspec-testfile-1.txt"
+      @path2 = "rspec-testfile-2.txt"
+
+      Filestore::delete(@path)
+      Filestore::delete(@path1)
+      Filestore::delete(@path2)
     end
 
     after :all do
       @file.unlink
+      @filetoo.unlink
     end
 
     it "should be able to save the file" do
@@ -74,13 +88,47 @@ describe S3helper do
       expect(text).to eq(@message)
     end
 
+    it "should be able to find the next available name" do
+      newpath = Filestore::find_available_name(@path)
+      expect(newpath).to eq(@path1)
+    end
+
+    it "should be able to save without clobbering" do
+      newpath = Filestore::writenc(@path, @filetoo)
+      expect(Filestore::exists?(newpath)).to be true
+      expect(newpath).to eq(@path1)
+      expect(Filestore::read(@path)).to eq(@message)
+      expect(Filestore::read(newpath)).to eq(@messagetoo)
+    end
+
+    it "should be able to rename" do
+      Filestore::rename(@path1,"voodoo")
+      expect(Filestore::exists?("voodoo")).to be true
+      expect(Filestore::exists?(@path1)).to be false
+      Filestore::rename("voodoo",@path1)
+    end
+
+    it "should be able to rename without clobbering" do
+      newpath = Filestore::renamenc(@path1,@path)
+      expect(newpath).to eq(@path2)
+      expect(Filestore::exists?("voodoo")).to be false
+      expect(Filestore::exists?(@path2)).to be true
+    end
+
     it "should be able to delete the file" do
       Filestore::delete(@path)
       expect(Filestore::exists?(@path)).to be false
     end
 
     it "should no longer be able to see the saved file in the directory listing" do
-      expect(Filestore::ls).to_not include(@testfile)
+      expect(Filestore::ls).to_not include(@path)
+      expect(Filestore::ls).to include(@path2)
+    end
+
+    it "should be able to delete the other file too" do
+      Filestore::delete(@path2)
+      expect(Filestore::exists?(@path2)).to be false
+      expect(Filestore::ls).to_not include(@path2)
     end
 
   end
@@ -94,6 +142,7 @@ describe S3helper do
       @dir = "rspec-tmp/"
       @testfile = "happyfile"
       @path = @dir + @testfile
+      @path1 = @path + "-1"
     end
 
     after :all do
@@ -154,6 +203,11 @@ describe S3helper do
     it "should be able to read the file via http" do
       text = open(Filestore::uribase + @path).read
       expect(text).to eq(@message)
+    end
+
+    it "should be able to find the next available name" do
+      newpath = Filestore::find_available_name(@path)
+      expect(newpath).to eq(@path1)
     end
 
     it "should be able to delete the file" do
